@@ -16,10 +16,10 @@
       <pubDate>Tue, 27 Feb 2018 00:00:00 +0000</pubDate>
       
       <guid>/post/historical-vx-data-and-contango/</guid>
-      <description>
-
-&lt;p&gt;The &lt;a href=&#34;http://cfe.cboe.com/market-data/historical-data&#34; target=&#34;_blank&#34;&gt;CBOE&lt;/a&gt; site makes historical data available for personal use and this post describes a method
+      <description>&lt;p&gt;The &lt;a href=&#34;http://cfe.cboe.com/market-data/historical-data&#34; target=&#34;_blank&#34;&gt;CBOE&lt;/a&gt; site makes historical data available for personal use and this post describes a method
 for gathering and processing this data for analysis.&lt;/p&gt;
+
+&lt;p&gt;&lt;/p&gt;
 
 &lt;h4 id=&#34;setup-global-option-load-libraries&#34;&gt;Setup global option, load libraries:&lt;/h4&gt;
 
@@ -237,8 +237,7 @@ vx_data &amp;lt;- purrr::map_df(vx_files$file_name, utils::read.table, blank.lin
 &lt;h4 id=&#34;save-results&#34;&gt;Save Results&lt;/h4&gt;
 
 &lt;pre&gt;&lt;code class=&#34;language-r&#34;&gt;saveRDS(vx_data, file = paste0(&amp;quot;vx_data_&amp;quot;, Sys.Date(), &amp;quot;.RDS&amp;quot;))
-&lt;/code&gt;&lt;/pre&gt;
-</description>
+&lt;/code&gt;&lt;/pre&gt;</description>
     </item>
     
     <item>

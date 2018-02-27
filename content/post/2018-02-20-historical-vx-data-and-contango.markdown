@@ -15,6 +15,8 @@ tags:
 The [CBOE](http://cfe.cboe.com/market-data/historical-data) site makes historical data available for personal use and this post describes a method 
 for gathering and processing this data for analysis. 
 
+<!--more-->  
+
 #### Setup global option, load libraries:
 
 

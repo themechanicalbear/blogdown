@@ -18,8 +18,10 @@
       <pubDate>Tue, 27 Feb 2018 00:00:00 +0000</pubDate>
       
       <guid>/post/historical-vx-data-and-contango/</guid>
-      <description>The CBOE site makes historical data available for personal use and this post describes a method for gathering and processing this data for analysis.
-Setup global option, load libraries: knitr::opts_chunk$set(message = FALSE, tidy.opts = list(width.cutoff = 60)) suppressWarnings(suppressMessages(suppressPackageStartupMessages({ library_list &amp;lt;- c(&amp;quot;xml2&amp;quot;, &amp;quot;rvest&amp;quot;, &amp;quot;stringr&amp;quot;, &amp;quot;dplyr&amp;quot;, &amp;quot;tidyr&amp;quot;, &amp;quot;utils&amp;quot;, &amp;quot;ggplot2&amp;quot;, &amp;quot;purrr&amp;quot;, &amp;quot;lubridate&amp;quot;, &amp;quot;stats&amp;quot;, &amp;quot;zoo&amp;quot;, &amp;quot;knitr&amp;quot;, &amp;quot;kableExtra&amp;quot;) lapply(library_list, require, character.only = TRUE)})))  Gathering the data from CBOE site VX - Cboe S&amp;amp;P 500 Volatility Index (VIX) Futures Price and Volume Detail:</description>
+      <description>&lt;p&gt;The &lt;a href=&#34;http://cfe.cboe.com/market-data/historical-data&#34; target=&#34;_blank&#34;&gt;CBOE&lt;/a&gt; site makes historical data available for personal use and this post describes a method
+for gathering and processing this data for analysis.&lt;/p&gt;
+
+&lt;p&gt;&lt;/p&gt;</description>
     </item>
     
   </channel>

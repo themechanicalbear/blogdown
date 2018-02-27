@@ -5,3 +5,6 @@
 blogdown
 Thumbs.db
 public/ # if using Netlify
+*.csv
+*.RDS
+

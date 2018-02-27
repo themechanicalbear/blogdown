@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Posts on Academic</title>
+    <title>Posts on R quant analysis</title>
     <link>/post/</link>
-    <description>Recent content in Posts on Academic</description>
+    <description>Recent content in Posts on R quant analysis</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
     <copyright>&amp;copy; 2018</copyright>
-    <lastBuildDate>Mon, 19 Feb 2018 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 01 Jan 2017 00:00:00 -0700</lastBuildDate>
     
 	<atom:link href="/post/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
-      <title>Test Post</title>
-      <link>/post/test-post/</link>
-      <pubDate>Mon, 19 Feb 2018 00:00:00 +0000</pubDate>
+      <title>Historical /VX data and Contango</title>
+      <link>/post/historical-vx-data-and-contango/</link>
+      <pubDate>Tue, 27 Feb 2018 00:00:00 +0000</pubDate>
       
-      <guid>/post/test-post/</guid>
-      <description>Testing 123&amp;hellip;</description>
+      <guid>/post/historical-vx-data-and-contango/</guid>
+      <description>The CBOE site makes historical data available for personal use and this post describes a method for gathering and processing this data for analysis.
+Setup global option, load libraries: knitr::opts_chunk$set(message = FALSE, tidy.opts = list(width.cutoff = 60)) suppressWarnings(suppressMessages(suppressPackageStartupMessages({ library_list &amp;lt;- c(&amp;quot;xml2&amp;quot;, &amp;quot;rvest&amp;quot;, &amp;quot;stringr&amp;quot;, &amp;quot;dplyr&amp;quot;, &amp;quot;tidyr&amp;quot;, &amp;quot;utils&amp;quot;, &amp;quot;ggplot2&amp;quot;, &amp;quot;purrr&amp;quot;, &amp;quot;lubridate&amp;quot;, &amp;quot;stats&amp;quot;, &amp;quot;zoo&amp;quot;, &amp;quot;knitr&amp;quot;, &amp;quot;kableExtra&amp;quot;) lapply(library_list, require, character.only = TRUE)})))  Gathering the data from CBOE site VX - Cboe S&amp;amp;P 500 Volatility Index (VIX) Futures Price and Volume Detail:</description>
     </item>
     
   </channel>

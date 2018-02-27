@@ -1,0 +1,130 @@
+---
+title: Historical /VX data and Contango
+author: Jason Taylor
+date: '2018-02-27'
+slug: historical-vx-data-and-contango
+categories:
+  - Data
+  - Volatility
+tags:
+  - Contango
+  - /VX
+  - Volatility
+---
+
+The [CBOE](http://cfe.cboe.com/market-data/historical-data) site makes historical data available for personal use and this post describes a method 
+for gathering and processing this data for analysis. 
+
+#### Setup global option, load libraries:
+
+```{r global_options, include = TRUE, results = FALSE}
+knitr::opts_chunk$set(message = FALSE, tidy.opts = list(width.cutoff = 60)) 
+suppressWarnings(suppressMessages(suppressPackageStartupMessages({
+  library_list <- c("xml2", "rvest", "stringr", "dplyr", "tidyr", "utils", "ggplot2",
+                    "purrr", "lubridate", "stats", "zoo", "knitr", "kableExtra")
+  lapply(library_list, require, character.only = TRUE)})))
+```
+#### Gathering the data from CBOE site
+VX - Cboe S&P 500 Volatility Index (VIX) Futures Price and Volume Detail:
+
+```{r Download Data}
+url <- "http://cfe.cboe.com/market-data/historical-data"
+regex_vx <- "CFE_[A-Z]{1}[0-9]{2}_(VX){1}(\\.){1}(csv){1}" # REGEX for VX files on site
+page <- xml2::read_html(url)
+
+file_paths <- page %>%
+  rvest::html_nodes("a") %>%       # find all links
+  rvest::html_attr("href") %>%     # get the url
+  stringr::str_subset("\\.csv")    # all csv files
+  
+file_paths <- as.data.frame(file_paths) %>%
+  dplyr::mutate(web_url = "http://cfe.cboe.com",
+                link = paste0(web_url, file_paths)) %>%
+  tidyr::separate(file_paths, into = c("blank", "Publish", "ScheduledTask", "MktData", 
+                                       "datahouse", "file_name"), sep = "/") %>%
+  dplyr::select(file_name, link) %>%
+  dplyr::filter(grepl(regex_vx, link))
+
+#mapply(utils::download.file, url = file_paths$link, destfile = file_paths$file_name)
+```
+
+#### Data Processing
+
+* Bind files  
+* Split contract name into year, month, contract symbol  
+* Calculate contango as % of front month - back month / front month settle  
+* Add front month and back month as new columns for clarity and future use in analysis  
+
+```{r Processing}
+vx_files = as.data.frame(list.files(pattern = regex_vx), stringsAsFactors = FALSE) %>%
+  stats::setNames(., "file_name")
+
+vx_data <- purrr::map_df(vx_files$file_name, utils::read.table, blank.lines.skip = TRUE,
+                         fill = TRUE, header = FALSE, quote = '', sep = ",",
+                         stringsAsFactors = FALSE) %>%
+  dplyr::select(1:11) %>% 
+  stats::setNames(., c("quote_date", "contract", "open", "high", "low", "close",
+                       "settle", "change", "volume", "efp", "open_interest")) %>%
+  dplyr::filter(!grepl("Trade", quote_date),
+                !grepl("CFE", quote_date)) %>%
+  dplyr::mutate(quote_date = as.Date(quote_date, format = "%m/%d/%Y"),
+                contract = gsub("\\(", "", contract),
+                contract = gsub("\\)", "", contract)) %>%
+  tidyr::separate(contract, c("contract", "month", "year"), sep = " ") %>%
+  dplyr::mutate(month = zoo::as.yearmon(month, "%b"),
+                month = lubridate::month(month),
+                year = paste0("20", year)) %>%
+  dplyr::mutate_at(vars(4:13), funs(as.numeric)) %>%
+  dplyr::group_by(quote_date) %>%
+  dplyr::arrange(year, month) %>%
+  dplyr::mutate(# diff each monthly contract settlement
+                contango = c(NA, diff(settle)), 
+                # shift forward a month
+                diff_month = dplyr::lead(contango, 1), 
+                # distribute the value across all months
+                diff_front_back = dplyr::nth(diff_month, 1), 
+                contango_perc = round(100 * (diff_front_back / dplyr::first(settle)),
+                                      digits = 2),
+                front_month = dplyr::nth(settle, 1),
+                back_month = dplyr::nth(settle, 2)) %>%
+  # Filter to the front month row since we are interested in M1/M2 contango
+  dplyr::filter(row_number() == 1) %>% 
+  dplyr::ungroup() %>%
+  dplyr::select(-c(efp, contango))
+```
+
+#### Output recent dates and summary statistics
+
+```{r print tables}
+knitr::kable(tail(vx_data[ , c(1, 15:17)]))
+summary(vx_data)
+```
+
+#### The following details should be reviewed prior to using the data for further analysis.  
+* The summary statistics reveal `r dplyr::tally(vx_data, is.na(open))` record that is missing the daily pricing details
+(open, high, low, close)  
+* `r dplyr::tally(vx_data, open == 0 | high == 0 | low == 0 | close == 0)` records have an (open, high, low, or close) value equal to 0  
+* `r dplyr::tally(vx_data, contango_perc == -100)` records between 2004-2006 have a contango % of -100%  
+
+#### Plotting the distribution of the contango %  
+* shows a normal distibution  
+* including the outlier -100% data points  
+
+```{r plot}
+ggplot(data = vx_data, aes(contango_perc)) + 
+  geom_histogram(breaks = seq(-100, 50, by = 2), 
+                 col = "black", 
+                 fill = "grey", 
+                 alpha = .2) + 
+  labs(title = "Histogram for Contango %") +
+  labs(x = "Contango %", y = "Count") + 
+  xlim(c(-100, 50)) + 
+  ylim(c(0, 550))
+```
+
+#### Save Results
+
+```{r Save}
+saveRDS(vx_data, file = paste0("vx_data_", Sys.Date(), ".RDS"))
+```
+

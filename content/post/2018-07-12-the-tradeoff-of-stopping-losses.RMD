@@ -29,7 +29,6 @@ library(ggplot2)
 library(plotly)
 stock_list <- c("SPY", "IWM", "GLD", "QQQ", "DIA", "NFLX", "TLT", "XLE", "EEM",
                 "MA", "FB", "FXI", "SLV", "EWZ", "FXE", "TBT", "IBM")
-#stock_list <- c("SPY", "IWM")
 tar_dte <- 45
 tar_delta_put <- -.16
 tar_delta_call <- .16

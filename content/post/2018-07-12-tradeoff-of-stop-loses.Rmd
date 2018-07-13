@@ -2,7 +2,7 @@
 title: Tradeoff of Stop Losses
 summary: "Stop losses are a popular strategy used by traders to achieve better performance by closing out of a losing trade. But do they work"
 author: Jason Taylor
-date: '2018-07-12'
+date: '2018-07-13'
 slug: tradeoff-of-stop-losses
 categories:
   - tastytrade
@@ -10,9 +10,6 @@ categories:
 tags:
   - Strangles
   - Stop Loss
-header:
-  caption: ''
-  image: ''
 ---
 
 ### Market Measures - July 10, 2018

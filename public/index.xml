@@ -11,6 +11,190 @@
     <atom:link href="/" rel="self" type="application/rss+xml" />
     
     <item>
+      <title>Tradeoff of Stop Losses</title>
+      <link>/post/tradeoff-of-stop-losses/</link>
+      <pubDate>Thu, 12 Jul 2018 00:00:00 +0000</pubDate>
+      
+      <guid>/post/tradeoff-of-stop-losses/</guid>
+      <description>&lt;script src=&#34;/rmarkdown-libs/htmlwidgets/htmlwidgets.js&#34;&gt;&lt;/script&gt;
+&lt;script src=&#34;/rmarkdown-libs/plotly-binding/plotly.js&#34;&gt;&lt;/script&gt;
+&lt;script src=&#34;/rmarkdown-libs/typedarray/typedarray.min.js&#34;&gt;&lt;/script&gt;
+&lt;script src=&#34;/rmarkdown-libs/jquery/jquery.min.js&#34;&gt;&lt;/script&gt;
+&lt;link href=&#34;/rmarkdown-libs/crosstalk/css/crosstalk.css&#34; rel=&#34;stylesheet&#34; /&gt;
+&lt;script src=&#34;/rmarkdown-libs/crosstalk/js/crosstalk.min.js&#34;&gt;&lt;/script&gt;
+&lt;link href=&#34;/rmarkdown-libs/plotlyjs/plotly-htmlwidgets.css&#34; rel=&#34;stylesheet&#34; /&gt;
+&lt;script src=&#34;/rmarkdown-libs/plotlyjs/plotly-latest.min.js&#34;&gt;&lt;/script&gt;
+
+
+&lt;div id=&#34;market-measures---july-10-2018&#34; class=&#34;section level3&#34;&gt;
+&lt;h3&gt;Market Measures - July 10, 2018&lt;/h3&gt;
+&lt;p&gt;The setup - Montly SPY 16 delta strangles, 45DTE, hold to expiration, 1-5x loss of credit recieved&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Stop losses are a popular strategy used by traders to achieve better performance by closing out of a losing trade.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;tastytrade ran a study where they compared managing 16 delta strangles in SPY, 45 DTE at expiration and 1x-5x credit received losses. They found that on average, stop losses hurt performance over the long run, because most of the trades you stopped out of eventually had a better P/L at expiration.&lt;/em&gt;&lt;/p&gt;
+&lt;p&gt;Here I will recreate this study and extend it to include more underlyings to practice using the purrr package. This is the first attempt at recreating a Market Measure study and will be the basis of the tastytrade package on &lt;a href=&#34;https://github.com/themechanicalbear/tastytrade&#34;&gt;github&lt;/a&gt;.&lt;/p&gt;
+&lt;div id=&#34;setup-global-options-load-libraries&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Setup global options, load libraries:&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;knitr::opts_chunk$set(message = FALSE, tidy.opts = list(width.cutoff = 60)) 
+suppressWarnings(suppressMessages(suppressPackageStartupMessages({
+  library_list &amp;lt;- c(&amp;quot;tastytrade&amp;quot;, &amp;quot;dplyr&amp;quot;, &amp;quot;ggplot2&amp;quot;, &amp;quot;plotly&amp;quot;, &amp;quot;gridExtra&amp;quot;)
+  lapply(library_list, require, character.only = TRUE)})))
+
+stock_list &amp;lt;- c(&amp;quot;SPY&amp;quot;, &amp;quot;IWM&amp;quot;, &amp;quot;GLD&amp;quot;, &amp;quot;QQQ&amp;quot;, &amp;quot;DIA&amp;quot;, &amp;quot;TLT&amp;quot;, &amp;quot;XLE&amp;quot;, &amp;quot;EEM&amp;quot;,
+                &amp;quot;MA&amp;quot;, &amp;quot;FB&amp;quot;, &amp;quot;FXI&amp;quot;, &amp;quot;SLV&amp;quot;, &amp;quot;EWZ&amp;quot;, &amp;quot;FXE&amp;quot;, &amp;quot;TBT&amp;quot;, &amp;quot;IBM&amp;quot;)
+tar_dte &amp;lt;- 45
+tar_delta_put &amp;lt;- -.16
+tar_delta_call &amp;lt;- .16
+all_loss_table &amp;lt;- data.frame()
+all_results &amp;lt;- data.frame()&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;study-function&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Study function&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;study &amp;lt;- function(stock) {
+  options &amp;lt;- readRDS(paste0(here::here(), &amp;quot;/data/options/&amp;quot;, stock, &amp;quot;.RDS&amp;quot;)) %&amp;gt;%
+    dplyr::mutate(mid = (bid + ask) / 2)
+  monthly &amp;lt;- readRDS(paste0(here::here(), &amp;quot;/data/monthly.RDS&amp;quot;))
+  
+  options_filtered &amp;lt;- options %&amp;gt;%
+    dplyr::filter(quotedate %in% monthly$date) %&amp;gt;%
+    dplyr::mutate(m_dte = abs(dte - tar_dte))
+  
+  short_put_opens &amp;lt;- tastytrade::open_short_put(options_filtered, stock, 
+                                                tar_delta_put)
+  short_call_opens &amp;lt;- tastytrade::open_short_call(options_filtered, stock,
+                                                  tar_delta_call)
+  
+  all_trades &amp;lt;- dplyr::full_join(short_call_opens, short_put_opens, 
+                                 by = c(&amp;quot;quotedate&amp;quot;, &amp;quot;expiration&amp;quot;, &amp;quot;dte&amp;quot;)) %&amp;gt;%
+    dplyr::mutate(credit = mid_put + mid_call)
+  
+  all_closes &amp;lt;- data.frame()
+  
+  possible_closes &amp;lt;- function(date, exp, c_strike, p_strike, credit) {
+    closes &amp;lt;- options %&amp;gt;%
+      dplyr::filter(quotedate &amp;gt; date,
+                    quotedate &amp;lt;= exp,
+                    expiration == exp) %&amp;gt;%
+      dplyr::filter((strike == c_strike &amp;amp; type == &amp;quot;call&amp;quot;) |
+                      (strike == p_strike &amp;amp; type == &amp;quot;put&amp;quot;)) %&amp;gt;%
+      dplyr::group_by(quotedate) %&amp;gt;%
+      dplyr::mutate(open_date = as.Date(date, origin = &amp;quot;1970-01-01&amp;quot;),
+                    open_credit = credit,
+                    debit = sum(mid),
+                    profit = open_credit - debit,
+                    loss_1_x = ifelse(debit &amp;gt;= 2 * credit, 1, 0),
+                    loss_2_x = ifelse(debit &amp;gt;= 3 * credit, 1, 0),
+                    loss_3_x = ifelse(debit &amp;gt;= 4 * credit, 1, 0),
+                    loss_4_x = ifelse(debit &amp;gt;= 5 * credit, 1, 0),
+                    loss_5_x = ifelse(debit &amp;gt;= 6 * credit, 1, 0)) %&amp;gt;%
+      dplyr::ungroup() %&amp;gt;%
+      dplyr::select(symbol, quotedate, expiration, open_date, open_credit,
+                    debit, profit, loss_1_x, loss_2_x, loss_3_x, loss_4_x,
+                    loss_5_x) %&amp;gt;%
+      dplyr::distinct()
+    
+    all_closes &amp;lt;&amp;lt;- rbind(all_closes, closes)
+  }
+  
+  invisible(purrr::pmap(list(all_trades$quotedate, all_trades$expiration,
+                             all_trades$strike_call, all_trades$strike_put, 
+                             all_trades$credit), possible_closes))
+  
+  invisible(purrr::pmap(list(df = list(all_closes), 
+                             col_name = list(&amp;quot;loss_1_x&amp;quot;, &amp;quot;loss_2_x&amp;quot;, &amp;quot;loss_3_x&amp;quot;,
+                                             &amp;quot;loss_4_x&amp;quot;, &amp;quot;loss_5_x&amp;quot;)),
+                        tastytrade::stop_loss))
+  
+  expiration &amp;lt;- all_closes %&amp;gt;%
+    dplyr::group_by(open_date) %&amp;gt;%
+    dplyr::filter(quotedate == expiration) %&amp;gt;%
+    dplyr::ungroup() %&amp;gt;%
+    dplyr::arrange(quotedate) %&amp;gt;%
+    dplyr::mutate(portfolio = cumsum(profit) * 100,
+                  loss_type = &amp;quot;expiration&amp;quot;)
+  
+  symbol_results &amp;lt;- dplyr::bind_rows(loss_1_x, loss_2_x) %&amp;gt;%
+    dplyr::bind_rows(loss_3_x) %&amp;gt;%
+    dplyr::bind_rows(loss_4_x) %&amp;gt;%
+    dplyr::bind_rows(loss_5_x) %&amp;gt;%
+    dplyr::bind_rows(expiration)
+  
+  all_results &amp;lt;- rbind(all_results, symbol_results)
+  assign(&amp;quot;all_results&amp;quot;, all_results, envir = .GlobalEnv)
+  
+  this_loss_table &amp;lt;- dplyr::bind_rows(loss_1_x, loss_2_x) %&amp;gt;%
+    dplyr::bind_rows(loss_3_x) %&amp;gt;%
+    dplyr::bind_rows(loss_4_x) %&amp;gt;%
+    dplyr::bind_rows(loss_5_x) %&amp;gt;%
+    dplyr::bind_rows(expiration) %&amp;gt;%
+    dplyr::group_by(loss_type) %&amp;gt;%
+    dplyr::filter(open_date == max(open_date)) %&amp;gt;%
+    dplyr::ungroup() %&amp;gt;%
+    dplyr::mutate(rank = rank(-portfolio)) %&amp;gt;%
+    dplyr::select(symbol, loss_type, rank) %&amp;gt;%
+    tidyr::spread(., key = loss_type, value = rank)
+  
+  all_loss_table &amp;lt;- rbind(all_loss_table, this_loss_table) 
+  assign(&amp;quot;all_loss_table&amp;quot;, all_loss_table, envir = .GlobalEnv)
+}&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;run-the-study-with-purrrmap-on-each-symbol&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Run the study with purrr::map on each symbol&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;invisible(purrr::map(stock_list, study))&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+&lt;div id=&#34;group-returns-to-similar-portfolio-outcomes-and-split-so-the-plots-are-not-as-large&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;Group returns to similar portfolio outcomes and split so the plots are not as large&lt;/h4&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;group_one_returns &amp;lt;- all_results %&amp;gt;%
+  dplyr::filter(symbol %in% c(&amp;quot;EWZ&amp;quot;, &amp;quot;TLT&amp;quot;, &amp;quot;SLV&amp;quot;, &amp;quot;FXI&amp;quot;, &amp;quot;XLE&amp;quot;, &amp;quot;EEM&amp;quot;, &amp;quot;FXE&amp;quot;))
+group_two_returns &amp;lt;- all_results %&amp;gt;%
+  dplyr::filter(symbol %in% c(&amp;quot;GLD&amp;quot;, &amp;quot;QQQ&amp;quot;, &amp;quot;DIA&amp;quot;, &amp;quot;IWM&amp;quot;, &amp;quot;IBM&amp;quot;, &amp;quot;SPY&amp;quot;, &amp;quot;MA&amp;quot;))
+
+grouped_plot &amp;lt;- function(df) {
+  ggplot(data = df, aes(x = quotedate, y = portfolio)) +
+    geom_line(data = dplyr::filter(df, loss_type == &amp;quot;loss_1_x&amp;quot;), 
+              aes(group = loss_type, color = &amp;quot;1X Stop&amp;quot;)) +
+    geom_line(data = dplyr::filter(df, loss_type == &amp;quot;loss_2_x&amp;quot;),
+              aes(color = &amp;quot;2X Stop&amp;quot;)) +
+    geom_line(data = dplyr::filter(df, loss_type == &amp;quot;loss_3_x&amp;quot;),
+              aes(color = &amp;quot;3X Stop&amp;quot;)) +
+    geom_line(data = dplyr::filter(df, loss_type == &amp;quot;loss_4_x&amp;quot;),
+              aes(color = &amp;quot;4X Stop&amp;quot;)) +
+    geom_line(data = dplyr::filter(df, loss_type == &amp;quot;loss_5_x&amp;quot;),
+              aes(color = &amp;quot;5X Stop&amp;quot;)) +
+    geom_line(data = dplyr::filter(df, loss_type == &amp;quot;expiration&amp;quot;),
+              aes(color = &amp;quot;expiration&amp;quot;)) +
+    scale_fill_brewer() +
+    theme_dark() + 
+    labs(title = &amp;quot;Portfolio Total Return (by stop loss)&amp;quot;, x = &amp;quot;Trade Open Date&amp;quot;,
+         y = &amp;quot;Portfolio Value&amp;quot;) +
+    facet_grid(rows = vars(symbol), scales = &amp;quot;free_y&amp;quot;)
+}
+
+grouped_plot(group_one_returns)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2018-07-12-tradeoff-of-stop-loses_files/figure-html/ggplots-1.png&#34; width=&#34;768&#34; /&gt;&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;grouped_plot(group_two_returns)&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;&lt;img src=&#34;/post/2018-07-12-tradeoff-of-stop-loses_files/figure-html/ggplots-2.png&#34; width=&#34;768&#34; /&gt;&lt;/p&gt;
+&lt;/div&gt;
+&lt;div id=&#34;this-heat-map-shows-the-outcomes-by-stop-loss-type-the-darker-the-color-the-better-the-outcome&#34; class=&#34;section level4&#34;&gt;
+&lt;h4&gt;This heat map shows the outcomes by stop loss type the darker the color the better the outcome&lt;/h4&gt;
+&lt;p&gt;These are ranked from (1-6) 1 being best&lt;br /&gt;
+On average holding to expiration performed best and stopping out too early performed the worst as seen in the mean total row at the top.&lt;/p&gt;
+&lt;pre class=&#34;r&#34;&gt;&lt;code&gt;heat_map_data &amp;lt;- all_loss_table %&amp;gt;%
+  dplyr::bind_rows(summarise_all(., funs(if (is.numeric(.)) mean(.) else &amp;quot;Mean Total&amp;quot;))) %&amp;gt;%
+  tibble::remove_rownames(.) %&amp;gt;%
+  tibble::column_to_rownames(var = &amp;quot;symbol&amp;quot;)
+heat_map_data &amp;lt;- as.matrix(heat_map_data)
+
+plot_ly(x = colnames(heat_map_data), y = rownames(heat_map_data), 
+        z = heat_map_data, type = &amp;quot;heatmap&amp;quot;, 
+        colors = colorRamp(c(&amp;quot;red&amp;quot;, &amp;quot;yellow&amp;quot;)))&lt;/code&gt;&lt;/pre&gt;
+&lt;div id=&#34;9890250956c5&#34; style=&#34;width:672px;height:480px;&#34; class=&#34;plotly html-widget&#34;&gt;&lt;/div&gt;
+&lt;script type=&#34;application/json&#34; data-for=&#34;9890250956c5&#34;&gt;{&#34;x&#34;:{&#34;visdat&#34;:{&#34;9890564e2797&#34;:[&#34;function () &#34;,&#34;plotlyVisDat&#34;]},&#34;cur_data&#34;:&#34;9890564e2797&#34;,&#34;attrs&#34;:{&#34;9890564e2797&#34;:{&#34;x&#34;:[&#34;expiration&#34;,&#34;loss_1_x&#34;,&#34;loss_2_x&#34;,&#34;loss_3_x&#34;,&#34;loss_4_x&#34;,&#34;loss_5_x&#34;],&#34;y&#34;:[&#34;SPY&#34;,&#34;IWM&#34;,&#34;GLD&#34;,&#34;QQQ&#34;,&#34;DIA&#34;,&#34;TLT&#34;,&#34;XLE&#34;,&#34;EEM&#34;,&#34;MA&#34;,&#34;FB&#34;,&#34;FXI&#34;,&#34;SLV&#34;,&#34;EWZ&#34;,&#34;FXE&#34;,&#34;TBT&#34;,&#34;IBM&#34;,&#34;Mean Total&#34;],&#34;z&#34;:[[1,6,3,4,5,2],[3,6,5,4,2,1],[2,6,3,1,4,5],[1,6,5,4,3,2],[1,6,3,4,5,2],[3,1,5,6,2,4],[2,5,6,4,1,3],[1.5,5,6,3,4,1.5],[1,6,5,4,3,2],[3,5,6,4,1.5,1.5],[1,2,5,6,3,4],[1,5,6,4,2,3],[4,2,1,3,5,6],[2,4,3,6,5,1],[5,1,3,6,2,4],[2,6,3,5,4,1],[2.09375,4.5,4.25,4.25,3.21875,2.6875]],&#34;colors&#34;:[&#34;function (x) &#34;,&#34;roundcolor(cbind(palette[[1L]](x), palette[[2L]](x), palette[[3L]](x), &#34;,&#34;    if (alpha) palette[[4L]](x))) * 255&#34;],&#34;alpha&#34;:1,&#34;sizes&#34;:[10,100],&#34;type&#34;:&#34;heatmap&#34;}},&#34;layout&#34;:{&#34;margin&#34;:{&#34;b&#34;:40,&#34;l&#34;:60,&#34;t&#34;:25,&#34;r&#34;:10},&#34;xaxis&#34;:{&#34;domain&#34;:[0,1]},&#34;yaxis&#34;:{&#34;domain&#34;:[0,1]},&#34;hovermode&#34;:&#34;closest&#34;,&#34;showlegend&#34;:false,&#34;legend&#34;:{&#34;y&#34;:0.5,&#34;yanchor&#34;:&#34;top&#34;}},&#34;source&#34;:&#34;A&#34;,&#34;config&#34;:{&#34;modeBarButtonsToAdd&#34;:[{&#34;name&#34;:&#34;Collaborate&#34;,&#34;icon&#34;:{&#34;width&#34;:1000,&#34;ascent&#34;:500,&#34;descent&#34;:-50,&#34;path&#34;:&#34;M487 375c7-10 9-23 5-36l-79-259c-3-12-11-23-22-31-11-8-22-12-35-12l-263 0c-15 0-29 5-43 15-13 10-23 23-28 37-5 13-5 25-1 37 0 0 0 3 1 7 1 5 1 8 1 11 0 2 0 4-1 6 0 3-1 5-1 6 1 2 2 4 3 6 1 2 2 4 4 6 2 3 4 5 5 7 5 7 9 16 13 26 4 10 7 19 9 26 0 2 0 5 0 9-1 4-1 6 0 8 0 2 2 5 4 8 3 3 5 5 5 7 4 6 8 15 12 26 4 11 7 19 7 26 1 1 0 4 0 9-1 4-1 7 0 8 1 2 3 5 6 8 4 4 6 6 6 7 4 5 8 13 13 24 4 11 7 20 7 28 1 1 0 4 0 7-1 3-1 6-1 7 0 2 1 4 3 6 1 1 3 4 5 6 2 3 3 5 5 6 1 2 3 5 4 9 2 3 3 7 5 10 1 3 2 6 4 10 2 4 4 7 6 9 2 3 4 5 7 7 3 2 7 3 11 3 3 0 8 0 13-1l0-1c7 2 12 2 14 2l218 0c14 0 25-5 32-16 8-10 10-23 6-37l-79-259c-7-22-13-37-20-43-7-7-19-10-37-10l-248 0c-5 0-9-2-11-5-2-3-2-7 0-12 4-13 18-20 41-20l264 0c5 0 10 2 16 5 5 3 8 6 10 11l85 282c2 5 2 10 2 17 7-3 13-7 17-13z m-304 0c-1-3-1-5 0-7 1-1 3-2 6-2l174 0c2 0 4 1 7 2 2 2 4 4 5 7l6 18c0 3 0 5-1 7-1 1-3 2-6 2l-173 0c-3 0-5-1-8-2-2-2-4-4-4-7z m-24-73c-1-3-1-5 0-7 2-2 3-2 6-2l174 0c2 0 5 0 7 2 3 2 4 4 5 7l6 18c1 2 0 5-1 6-1 2-3 3-5 3l-174 0c-3 0-5-1-7-3-3-1-4-4-5-6z&#34;},&#34;click&#34;:&#34;function(gd) { \n        // is this being viewed in RStudio?\n        if (location.search == &#39;?viewer_pane=1&#39;) {\n          alert(&#39;To learn about plotly for collaboration, visit:\\n https://cpsievert.github.io/plotly_book/plot-ly-for-collaboration.html&#39;);\n        } else {\n          window.open(&#39;https://cpsievert.github.io/plotly_book/plot-ly-for-collaboration.html&#39;, &#39;_blank&#39;);\n        }\n      }&#34;}],&#34;cloud&#34;:false},&#34;data&#34;:[{&#34;colorbar&#34;:{&#34;title&#34;:&#34;&#34;,&#34;ticklen&#34;:2,&#34;len&#34;:0.5,&#34;y&#34;:1,&#34;lenmode&#34;:&#34;fraction&#34;,&#34;yanchor&#34;:&#34;top&#34;},&#34;colorscale&#34;:[[&#34;0&#34;,&#34;rgba(255,0,0,1)&#34;],[&#34;0.1&#34;,&#34;rgba(255,25,0,1)&#34;],[&#34;0.2&#34;,&#34;rgba(255,51,0,1)&#34;],[&#34;0.379166666666667&#34;,&#34;rgba(255,96,0,1)&#34;],[&#34;0.4&#34;,&#34;rgba(255,102,0,1)&#34;],[&#34;0.521875&#34;,&#34;rgba(255,133,0,1)&#34;],[&#34;0.6&#34;,&#34;rgba(255,153,0,1)&#34;],[&#34;0.65&#34;,&#34;rgba(255,165,0,1)&#34;],[&#34;0.8&#34;,&#34;rgba(255,204,0,1)&#34;],[&#34;1&#34;,&#34;rgba(255,255,0,1)&#34;]],&#34;showscale&#34;:true,&#34;x&#34;:[&#34;expiration&#34;,&#34;loss_1_x&#34;,&#34;loss_2_x&#34;,&#34;loss_3_x&#34;,&#34;loss_4_x&#34;,&#34;loss_5_x&#34;],&#34;y&#34;:[&#34;SPY&#34;,&#34;IWM&#34;,&#34;GLD&#34;,&#34;QQQ&#34;,&#34;DIA&#34;,&#34;TLT&#34;,&#34;XLE&#34;,&#34;EEM&#34;,&#34;MA&#34;,&#34;FB&#34;,&#34;FXI&#34;,&#34;SLV&#34;,&#34;EWZ&#34;,&#34;FXE&#34;,&#34;TBT&#34;,&#34;IBM&#34;,&#34;Mean Total&#34;],&#34;z&#34;:[[1,6,3,4,5,2],[3,6,5,4,2,1],[2,6,3,1,4,5],[1,6,5,4,3,2],[1,6,3,4,5,2],[3,1,5,6,2,4],[2,5,6,4,1,3],[1.5,5,6,3,4,1.5],[1,6,5,4,3,2],[3,5,6,4,1.5,1.5],[1,2,5,6,3,4],[1,5,6,4,2,3],[4,2,1,3,5,6],[2,4,3,6,5,1],[5,1,3,6,2,4],[2,6,3,5,4,1],[2.09375,4.5,4.25,4.25,3.21875,2.6875]],&#34;type&#34;:&#34;heatmap&#34;,&#34;xaxis&#34;:&#34;x&#34;,&#34;yaxis&#34;:&#34;y&#34;,&#34;frame&#34;:null}],&#34;highlight&#34;:{&#34;on&#34;:&#34;plotly_click&#34;,&#34;persistent&#34;:false,&#34;dynamic&#34;:false,&#34;selectize&#34;:false,&#34;opacityDim&#34;:0.2,&#34;selected&#34;:{&#34;opacity&#34;:1}},&#34;base_url&#34;:&#34;https://plot.ly&#34;},&#34;evals&#34;:[&#34;config.modeBarButtonsToAdd.0.click&#34;],&#34;jsHooks&#34;:{&#34;render&#34;:[{&#34;code&#34;:&#34;function(el, x) { var ctConfig = crosstalk.var(&#39;plotlyCrosstalkOpts&#39;).set({\&#34;on\&#34;:\&#34;plotly_click\&#34;,\&#34;persistent\&#34;:false,\&#34;dynamic\&#34;:false,\&#34;selectize\&#34;:false,\&#34;opacityDim\&#34;:0.2,\&#34;selected\&#34;:{\&#34;opacity\&#34;:1}}); }&#34;,&#34;data&#34;:null}]}}&lt;/script&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+</description>
+    </item>
+    
+    <item>
       <title>Historical /VX data and Contango</title>
       <link>/post/historical-vx-data-and-contango/</link>
       <pubDate>Tue, 27 Feb 2018 00:00:00 +0000</pubDate>

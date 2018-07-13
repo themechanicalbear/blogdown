@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>R quant analysis on R quant analysis</title>
+    <link>/</link>
+    <description>Recent content in R quant analysis on R quant analysis</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <copyright>&amp;copy; 2018</copyright>
+    <lastBuildDate>Wed, 20 Apr 2016 00:00:00 +0000</lastBuildDate>
+    <atom:link href="/" rel="self" type="application/rss+xml" />
+    
+    <item>
+      <title>Historical /VX data and Contango</title>
+      <link>/post/historical-vx-data-and-contango/</link>
+      <pubDate>Tue, 27 Feb 2018 00:00:00 +0000</pubDate>
+      
+      <guid>/post/historical-vx-data-and-contango/</guid>
+      <description>&lt;p&gt;The &lt;a href=&#34;http://cfe.cboe.com/market-data/historical-data&#34; target=&#34;_blank&#34;&gt;CBOE&lt;/a&gt; site makes historical data available for personal use and this post describes a method
+for gathering and processing this data for analysis.&lt;/p&gt;
+
+&lt;p&gt;&lt;/p&gt;
+
+&lt;h4 id=&#34;setup-global-option-load-libraries&#34;&gt;Setup global option, load libraries:&lt;/h4&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-r&#34;&gt;knitr::opts_chunk$set(message = FALSE, tidy.opts = list(width.cutoff = 60)) 
+suppressWarnings(suppressMessages(suppressPackageStartupMessages({
+  library_list &amp;lt;- c(&amp;quot;xml2&amp;quot;, &amp;quot;rvest&amp;quot;, &amp;quot;stringr&amp;quot;, &amp;quot;dplyr&amp;quot;, &amp;quot;tidyr&amp;quot;, &amp;quot;utils&amp;quot;, &amp;quot;ggplot2&amp;quot;,
+                    &amp;quot;purrr&amp;quot;, &amp;quot;lubridate&amp;quot;, &amp;quot;stats&amp;quot;, &amp;quot;zoo&amp;quot;, &amp;quot;knitr&amp;quot;, &amp;quot;kableExtra&amp;quot;)
+  lapply(library_list, require, character.only = TRUE)})))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h4 id=&#34;gathering-the-data-from-cboe-site&#34;&gt;Gathering the data from CBOE site&lt;/h4&gt;
+
+&lt;p&gt;VX - Cboe S&amp;amp;P 500 Volatility Index (VIX) Futures Price and Volume Detail:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-r&#34;&gt;url &amp;lt;- &amp;quot;http://cfe.cboe.com/market-data/historical-data&amp;quot;
+regex_vx &amp;lt;- &amp;quot;CFE_[A-Z]{1}[0-9]{2}_(VX){1}(\\.){1}(csv){1}&amp;quot; # REGEX for VX files on site
+page &amp;lt;- xml2::read_html(url)
+
+file_paths &amp;lt;- page %&amp;gt;%
+  rvest::html_nodes(&amp;quot;a&amp;quot;) %&amp;gt;%       # find all links
+  rvest::html_attr(&amp;quot;href&amp;quot;) %&amp;gt;%     # get the url
+  stringr::str_subset(&amp;quot;\\.csv&amp;quot;)    # all csv files
+  
+file_paths &amp;lt;- as.data.frame(file_paths) %&amp;gt;%
+  dplyr::mutate(web_url = &amp;quot;http://cfe.cboe.com&amp;quot;,
+                link = paste0(web_url, file_paths)) %&amp;gt;%
+  tidyr::separate(file_paths, into = c(&amp;quot;blank&amp;quot;, &amp;quot;Publish&amp;quot;, &amp;quot;ScheduledTask&amp;quot;, &amp;quot;MktData&amp;quot;, 
+                                       &amp;quot;datahouse&amp;quot;, &amp;quot;file_name&amp;quot;), sep = &amp;quot;/&amp;quot;) %&amp;gt;%
+  dplyr::select(file_name, link) %&amp;gt;%
+  dplyr::filter(grepl(regex_vx, link))
+
+#mapply(utils::download.file, url = file_paths$link, destfile = file_paths$file_name)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h4 id=&#34;data-processing&#34;&gt;Data Processing&lt;/h4&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Bind files&lt;br /&gt;&lt;/li&gt;
+&lt;li&gt;Split contract name into year, month, contract symbol&lt;br /&gt;&lt;/li&gt;
+&lt;li&gt;Calculate contango as % of front month - back month / front month settle&lt;br /&gt;&lt;/li&gt;
+&lt;li&gt;Add front month and back month as new columns for clarity and future use in analysis&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-r&#34;&gt;vx_files = as.data.frame(list.files(pattern = regex_vx), stringsAsFactors = FALSE) %&amp;gt;%
+  stats::setNames(., &amp;quot;file_name&amp;quot;)
+
+vx_data &amp;lt;- purrr::map_df(vx_files$file_name, utils::read.table, blank.lines.skip = TRUE,
+                         fill = TRUE, header = FALSE, quote = &#39;&#39;, sep = &amp;quot;,&amp;quot;,
+                         stringsAsFactors = FALSE) %&amp;gt;%
+  dplyr::select(1:11) %&amp;gt;% 
+  stats::setNames(., c(&amp;quot;quote_date&amp;quot;, &amp;quot;contract&amp;quot;, &amp;quot;open&amp;quot;, &amp;quot;high&amp;quot;, &amp;quot;low&amp;quot;, &amp;quot;close&amp;quot;,
+                       &amp;quot;settle&amp;quot;, &amp;quot;change&amp;quot;, &amp;quot;volume&amp;quot;, &amp;quot;efp&amp;quot;, &amp;quot;open_interest&amp;quot;)) %&amp;gt;%
+  dplyr::filter(!grepl(&amp;quot;Trade&amp;quot;, quote_date),
+                !grepl(&amp;quot;CFE&amp;quot;, quote_date)) %&amp;gt;%
+  dplyr::mutate(quote_date = as.Date(quote_date, format = &amp;quot;%m/%d/%Y&amp;quot;),
+                contract = gsub(&amp;quot;\\(&amp;quot;, &amp;quot;&amp;quot;, contract),
+                contract = gsub(&amp;quot;\\)&amp;quot;, &amp;quot;&amp;quot;, contract)) %&amp;gt;%
+  tidyr::separate(contract, c(&amp;quot;contract&amp;quot;, &amp;quot;month&amp;quot;, &amp;quot;year&amp;quot;), sep = &amp;quot; &amp;quot;) %&amp;gt;%
+  dplyr::mutate(month = zoo::as.yearmon(month, &amp;quot;%b&amp;quot;),
+                month = lubridate::month(month),
+                year = paste0(&amp;quot;20&amp;quot;, year)) %&amp;gt;%
+  dplyr::mutate_at(vars(4:13), funs(as.numeric)) %&amp;gt;%
+  dplyr::group_by(quote_date) %&amp;gt;%
+  dplyr::arrange(year, month) %&amp;gt;%
+  dplyr::mutate(# diff each monthly contract settlement
+                contango = c(NA, diff(settle)), 
+                # shift forward a month
+                diff_month = dplyr::lead(contango, 1), 
+                # distribute the value across all months
+                diff_front_back = dplyr::nth(diff_month, 1), 
+                contango_perc = round(100 * (diff_front_back / dplyr::first(settle)),
+                                      digits = 2),
+                front_month = dplyr::nth(settle, 1),
+                back_month = dplyr::nth(settle, 2)) %&amp;gt;%
+  # Filter to the front month row since we are interested in M1/M2 contango
+  dplyr::filter(row_number() == 1) %&amp;gt;% 
+  dplyr::ungroup() %&amp;gt;%
+  dplyr::select(-c(efp, contango))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h4 id=&#34;output-recent-dates-and-summary-statistics&#34;&gt;Output recent dates and summary statistics&lt;/h4&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-r&#34;&gt;knitr::kable(tail(vx_data[ , c(1, 15:17)]))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;table&gt;
+ &lt;thead&gt;
+  &lt;tr&gt;
+   &lt;th style=&#34;text-align:left;&#34;&gt; quote_date &lt;/th&gt;
+   &lt;th style=&#34;text-align:right;&#34;&gt; contango_perc &lt;/th&gt;
+   &lt;th style=&#34;text-align:right;&#34;&gt; front_month &lt;/th&gt;
+   &lt;th style=&#34;text-align:right;&#34;&gt; back_month &lt;/th&gt;
+  &lt;/tr&gt;
+ &lt;/thead&gt;
+&lt;tbody&gt;
+  &lt;tr&gt;
+   &lt;td style=&#34;text-align:left;&#34;&gt; 2018-02-08 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; -22.95 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 28.100 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 21.650 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style=&#34;text-align:left;&#34;&gt; 2018-02-09 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; -24.84 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 27.175 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 20.425 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style=&#34;text-align:left;&#34;&gt; 2018-02-12 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; -23.23 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 25.825 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 19.825 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style=&#34;text-align:left;&#34;&gt; 2018-02-13 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; -21.41 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 25.225 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 19.825 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style=&#34;text-align:left;&#34;&gt; 2018-02-14 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; -18.27 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 21.870 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 17.875 &lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+   &lt;td style=&#34;text-align:left;&#34;&gt; 2018-02-15 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; -1.14 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 17.525 &lt;/td&gt;
+   &lt;td style=&#34;text-align:right;&#34;&gt; 17.325 &lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-r&#34;&gt;summary(vx_data)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;pre&gt;&lt;code&gt;##    quote_date           contract             month             year     
+##  Min.   :2004-03-26   Length:3498        Min.   : 1.000   Min.   :2004  
+##  1st Qu.:2007-09-17   Class :character   1st Qu.: 4.000   1st Qu.:2007  
+##  Median :2011-03-07   Mode  :character   Median : 7.000   Median :2011  
+##  Mean   :2011-03-07                      Mean   : 6.566   Mean   :2011  
+##  3rd Qu.:2014-08-26                      3rd Qu.:10.000   3rd Qu.:2014  
+##  Max.   :2018-02-15                      Max.   :12.000   Max.   :2018  
+##                                                                         
+##       open             high             low             close       
+##  Min.   :  0.00   Min.   :  0.00   Min.   :  0.00   Min.   :  0.00  
+##  1st Qu.: 14.95   1st Qu.: 15.40   1st Qu.: 14.55   1st Qu.: 14.90  
+##  Median : 20.09   Median : 20.80   Median : 19.50   Median : 20.00  
+##  Mean   : 44.25   Mean   : 45.18   Mean   : 43.31   Mean   : 44.13  
+##  3rd Qu.: 36.05   3rd Qu.: 37.25   3rd Qu.: 34.10   3rd Qu.: 35.79  
+##  Max.   :212.40   Max.   :225.80   Max.   :206.00   Max.   :215.50  
+##  NA&#39;s   :1        NA&#39;s   :1        NA&#39;s   :1        NA&#39;s   :1       
+##      settle           change              volume         open_interest   
+##  Min.   :  8.75   Min.   :-119.9200   Min.   :     0.0   Min.   :   113  
+##  1st Qu.: 15.33   1st Qu.:  -0.7000   1st Qu.:   814.8   1st Qu.: 10882  
+##  Median : 20.80   Median :  -0.1500   Median :  9991.5   Median : 37320  
+##  Mean   : 46.02   Mean   :  -0.1934   Mean   : 39860.8   Mean   : 70475  
+##  3rd Qu.: 41.36   3rd Qu.:   0.4500   3rd Qu.: 69188.5   3rd Qu.:119694  
+##  Max.   :216.20   Max.   :  33.7000   Max.   :567407.0   Max.   :372068  
+##                                                                          
+##    diff_month       diff_front_back    contango_perc       front_month    
+##  Min.   :-191.700   Min.   :-191.700   Min.   :-100.000   Min.   :  8.75  
+##  1st Qu.:   0.500   1st Qu.:   0.500   1st Qu.:   2.300   1st Qu.: 15.33  
+##  Median :   1.350   Median :   1.350   Median :   6.720   Median : 20.80  
+##  Mean   :   2.391   Mean   :   2.391   Mean   :   5.856   Mean   : 46.02  
+##  3rd Qu.:   2.650   3rd Qu.:   2.650   3rd Qu.:  10.520   3rd Qu.: 41.36  
+##  Max.   :  56.060   Max.   :  56.060   Max.   :  42.680   Max.   :216.20  
+##                                                                           
+##    back_month    
+##  Min.   :  0.00  
+##  1st Qu.: 16.38  
+##  Median : 21.80  
+##  Mean   : 48.41  
+##  3rd Qu.: 38.09  
+##  Max.   :206.70  
+## 
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h4 id=&#34;the-following-details-should-be-reviewed-prior-to-using-the-data-for-further-analysis&#34;&gt;The following details should be reviewed prior to using the data for further analysis.&lt;/h4&gt;
+
+&lt;ul&gt;
+&lt;li&gt;The summary statistics reveal 1 record that is missing the daily pricing details
+(open, high, low, close)&lt;br /&gt;&lt;/li&gt;
+&lt;li&gt;125 records have an (open, high, low, or close) value equal to 0&lt;br /&gt;&lt;/li&gt;
+&lt;li&gt;9 records between 2004-2006 have a contango % of -100%&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&#34;plotting-the-distribution-of-the-contango&#34;&gt;Plotting the distribution of the contango %&lt;/h4&gt;
+
+&lt;ul&gt;
+&lt;li&gt;shows a normal distibution&lt;br /&gt;&lt;/li&gt;
+&lt;li&gt;including the outlier -100% data points&lt;br /&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-r&#34;&gt;ggplot(data = vx_data, aes(contango_perc)) + 
+  geom_histogram(breaks = seq(-100, 50, by = 2), 
+                 col = &amp;quot;black&amp;quot;, 
+                 fill = &amp;quot;grey&amp;quot;, 
+                 alpha = .2) + 
+  labs(title = &amp;quot;Histogram for Contango %&amp;quot;) +
+  labs(x = &amp;quot;Contango %&amp;quot;, y = &amp;quot;Count&amp;quot;) + 
+  xlim(c(-100, 50)) + 
+  ylim(c(0, 550))
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;&lt;img src=&#34;/post/2018-02-20-historical-vx-data-and-contango_files/figure-html/plot-1.png&#34; width=&#34;672&#34; /&gt;&lt;/p&gt;
+
+&lt;h4 id=&#34;save-results&#34;&gt;Save Results&lt;/h4&gt;
+
+&lt;pre&gt;&lt;code class=&#34;language-r&#34;&gt;saveRDS(vx_data, file = paste0(&amp;quot;vx_data_&amp;quot;, Sys.Date(), &amp;quot;.RDS&amp;quot;))
+&lt;/code&gt;&lt;/pre&gt;</description>
+    </item>
+    
+    <item>
+      <title>TBD Meetup</title>
+      <link>/talk/example-talk/</link>
+      <pubDate>Sun, 01 Jan 2017 00:00:00 -0700</pubDate>
+      
+      <guid>/talk/example-talk/</guid>
+      <description>&lt;p&gt;Embed your slides or video here using &lt;a href=&#34;https://sourcethemes.com/academic/post/writing-markdown-latex/&#34; target=&#34;_blank&#34;&gt;shortcodes&lt;/a&gt;. Further details can easily be added using &lt;em&gt;Markdown&lt;/em&gt; and $\rm \LaTeX$ math code.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>A Person Re-Identification System For Mobile Devices</title>
+      <link>/publication/person-re-identification/</link>
+      <pubDate>Tue, 01 Sep 2015 00:00:00 +0000</pubDate>
+      
+      <guid>/publication/person-re-identification/</guid>
+      <description>&lt;p&gt;More detail can easily be written here using &lt;em&gt;Markdown&lt;/em&gt; and $\rm \LaTeX$ math code.&lt;/p&gt;
+</description>
+    </item>
+    
+    <item>
+      <title>Mobile visual clothing search</title>
+      <link>/publication/clothing-search/</link>
+      <pubDate>Mon, 01 Jul 2013 00:00:00 +0000</pubDate>
+      
+      <guid>/publication/clothing-search/</guid>
+      <description>&lt;p&gt;More detail can easily be written here using &lt;em&gt;Markdown&lt;/em&gt; and $\rm \LaTeX$ math code.&lt;/p&gt;
+</description>
+    </item>
+    
+  </channel>
+</rss>

@@ -5,15 +5,6 @@
     
     <url>
     
-      <loc>/post/tradeoff-of-stop-losses/</loc>
-      <lastmod>2018-07-12T00:00:00+00:00</lastmod>
-    </url>
-    
-  
-    
-    
-    <url>
-    
       <loc>/post/historical-vx-data-and-contango/</loc>
       <lastmod>2018-02-27T00:00:00+00:00</lastmod>
     </url>
@@ -145,16 +136,6 @@
     
     <url>
     
-      <loc>/categories/market-measures/</loc>
-      <lastmod>2018-07-12T00:00:00+00:00</lastmod>
-      <priority>0</priority>
-    </url>
-    
-  
-    
-    
-    <url>
-    
       <loc>/publication_types/</loc>
       <lastmod>2013-07-01T00:00:00+00:00</lastmod>
       <priority>0</priority>
@@ -175,26 +156,6 @@
     
     <url>
     
-      <loc>/tags/stop-loss/</loc>
-      <lastmod>2018-07-12T00:00:00+00:00</lastmod>
-      <priority>0</priority>
-    </url>
-    
-  
-    
-    
-    <url>
-    
-      <loc>/tags/strangles/</loc>
-      <lastmod>2018-07-12T00:00:00+00:00</lastmod>
-      <priority>0</priority>
-    </url>
-    
-  
-    
-    
-    <url>
-    
       <loc>/tags/</loc>
       <lastmod>2017-01-01T00:00:00+00:00</lastmod>
       <priority>0</priority>
@@ -205,17 +166,7 @@
     
     <url>
     
-      <loc>/categories/tastytrade/</loc>
-      <lastmod>2018-07-12T00:00:00+00:00</lastmod>
-      <priority>0</priority>
-    </url>
-    
-  
-    
-    
-    <url>
-    
-      <loc>/categories/volatility/</loc>
+      <loc>/tags/volatility/</loc>
       <lastmod>2018-02-27T00:00:00+00:00</lastmod>
       <priority>0</priority>
     </url>
@@ -225,7 +176,7 @@
     
     <url>
     
-      <loc>/tags/volatility/</loc>
+      <loc>/categories/volatility/</loc>
       <lastmod>2018-02-27T00:00:00+00:00</lastmod>
       <priority>0</priority>
     </url>

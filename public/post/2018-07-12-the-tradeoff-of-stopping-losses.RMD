@@ -121,7 +121,7 @@ study <- function(stock) {
 }
 ```
 
-```{r run study}
+```{r run study} 
 purrr::map(stock_list, study)
 ```
 

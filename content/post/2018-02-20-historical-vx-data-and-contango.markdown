@@ -105,16 +105,54 @@ vx_data <- purrr::map_df(vx_files$file_name, utils::read.table, blank.lines.skip
 knitr::kable(tail(vx_data[ , c(1, 15:17)]))
 ```
 
-
-
-|quote_date | contango_perc| front_month| back_month|
-|:----------|-------------:|-----------:|----------:|
-|2018-02-08 |        -22.95|      28.100|     21.650|
-|2018-02-09 |        -24.84|      27.175|     20.425|
-|2018-02-12 |        -23.23|      25.825|     19.825|
-|2018-02-13 |        -21.41|      25.225|     19.825|
-|2018-02-14 |        -18.27|      21.870|     17.875|
-|2018-02-15 |         -1.14|      17.525|     17.325|
+<table>
+ <thead>
+  <tr>
+   <th style="text-align:left;"> quote_date </th>
+   <th style="text-align:right;"> contango_perc </th>
+   <th style="text-align:right;"> front_month </th>
+   <th style="text-align:right;"> back_month </th>
+  </tr>
+ </thead>
+<tbody>
+  <tr>
+   <td style="text-align:left;"> 2018-02-08 </td>
+   <td style="text-align:right;"> -22.95 </td>
+   <td style="text-align:right;"> 28.100 </td>
+   <td style="text-align:right;"> 21.650 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 2018-02-09 </td>
+   <td style="text-align:right;"> -24.84 </td>
+   <td style="text-align:right;"> 27.175 </td>
+   <td style="text-align:right;"> 20.425 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 2018-02-12 </td>
+   <td style="text-align:right;"> -23.23 </td>
+   <td style="text-align:right;"> 25.825 </td>
+   <td style="text-align:right;"> 19.825 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 2018-02-13 </td>
+   <td style="text-align:right;"> -21.41 </td>
+   <td style="text-align:right;"> 25.225 </td>
+   <td style="text-align:right;"> 19.825 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 2018-02-14 </td>
+   <td style="text-align:right;"> -18.27 </td>
+   <td style="text-align:right;"> 21.870 </td>
+   <td style="text-align:right;"> 17.875 </td>
+  </tr>
+  <tr>
+   <td style="text-align:left;"> 2018-02-15 </td>
+   <td style="text-align:right;"> -1.14 </td>
+   <td style="text-align:right;"> 17.525 </td>
+   <td style="text-align:right;"> 17.325 </td>
+  </tr>
+</tbody>
+</table>
 
 ```r
 summary(vx_data)
